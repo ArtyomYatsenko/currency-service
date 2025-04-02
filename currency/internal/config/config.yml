@@ -1,0 +1,11 @@
+port: "8000"
+task_start_time:
+  hour: 21
+  minute: 25
+db:
+  host: "localhost"
+  port: "5436"
+  user: "postgres"
+  password: "qwerty"
+  dbname: "postges"
+  sslmode: "disable"
