@@ -1,49 +1,95 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/ArtyomYatsenko/currency/internal/config"
-	"github.com/ArtyomYatsenko/currency/internal/db"
+	"github.com/ArtyomYatsenko/currency/internal/database"
 	"github.com/robfig/cron/v3"
-	"github.com/spf13/viper"
+	"io"
 	"log"
+	"net/http"
+	"os/signal"
+	"syscall"
+	"time"
 )
 
 func main() {
 
-	if err := config.LoadConfig(); err != nil {
-		log.Fatalf("error loading configuration: %s", err.Error())
+	if err := run(); err != nil {
+		log.Fatal(err)
 	}
 
-	_, err := db.NewPostgresDB(db.Config{
-		Host:     viper.GetString("db.host"),
-		Port:     viper.GetString("db.port"),
-		User:     viper.GetString("db.user"),
-		Password: viper.GetString("password"),
-		DBName:   viper.GetString("dbname"),
-		SSLMode:  viper.GetString("sslmode"),
-	})
+}
+
+func run() error {
+
+	configApp, err := config.LoadConfig()
 
 	if err != nil {
-		log.Fatalf("initialization error db: %s", err.Error())
+		return fmt.Errorf("config load config: %s", err)
+	}
+
+	db, err := database.NewPostgresDB(configApp.DataBaseConfig)
+
+	if err != nil {
+		return fmt.Errorf("database new postgres db: %s", err)
 	}
 
 	c := cron.New()
 
-	specParam := fmt.Sprintf("%d %d * * *", viper.GetInt("task_start_time.minute"), viper.GetInt("task_start_time.hour"))
+	specParam := fmt.Sprintf("%d %d * * *", configApp.TaskStartTime.Minute, configApp.TaskStartTime.Hour)
 
-	if _, err := c.AddFunc(specParam, dailyTask); err != nil {
-		log.Fatalf("error in starting cron task: %s", err.Error())
+	fmt.Println(configApp)
+
+	if _, err = c.AddFunc(specParam, dailyTask); err != nil {
+		return fmt.Errorf("cron add func: %s", err)
+
 	}
 
 	c.Start()
 
-	defer c.Stop()
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	defer cancel()
 
-	select {}
+	<-ctx.Done()
+
+	c.Stop()
+
+	if err = db.Close(); err != nil {
+		log.Printf("database close: %s", err)
+	}
+
+	return nil
 
 }
 
 func dailyTask() {
-	fmt.Println("Выполнение задачи")
+
+	log.Println("dailiTask")
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+	}
+
+	resp, err := client.Get("https://latest.currency-api.pages.dev/v1/currencies/rub.json")
+	if err != nil {
+		log.Printf("http client get: %s", err)
+	}
+
+	defer func() {
+		err = resp.Body.Close()
+		if err != nil {
+			log.Printf("http resp body close: %s", err)
+		}
+	}()
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+
+	var data map[string]interface{}
+
+	if err = json.Unmarshal(bodyBytes, &data); err != nil {
+		log.Printf("json unmarshal: %s", err)
+	}
+
 }
