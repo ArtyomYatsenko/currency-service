@@ -17,6 +17,7 @@ import (
 	"time"
 )
 
+//go:embed currency/internal/migrations/*.sql
 var MigrationsFS embed.FS
 
 func main() {
