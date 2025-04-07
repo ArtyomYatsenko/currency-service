@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"embed"
 	"fmt"
 	"github.com/ArtyomYatsenko/currency/internal/clients/currency"
 	"github.com/ArtyomYatsenko/currency/internal/config"
@@ -51,12 +50,11 @@ func run() error {
 	}
 
 	db, err := database.NewPostgresDB(configApp.DataBaseConfig) // Устанавливаю подключение к БД
-
 	if err != nil {
 		return fmt.Errorf("database new postgres db: %s", err)
 	}
 
-	migrator, err := migrations.NewMigrator(MigrationsFS, "/app/currency/internal/migrations") // Создаю мигратор
+	migrator, err := migrations.NewMigrator("todo add from config ))))") // Создаю мигратор
 	if err != nil {
 		return fmt.Errorf("migrations new migrator %s", err)
 	}

@@ -10,15 +10,19 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
+//go:embed *.sql
+var MigrationsFS embed.FS
+
 type Migrator struct {
 	srcDriver source.Driver
 }
 
-func NewMigrator(sqlFiles embed.FS, dirName string) (*Migrator, error) {
-	d, err := iofs.New(sqlFiles, dirName)
+func NewMigrator(dirName string) (*Migrator, error) {
+	d, err := iofs.New(MigrationsFS, ".")
 	if err != nil {
 		return nil, err
 	}
+
 	return &Migrator{
 		srcDriver: d,
 	}, nil
