@@ -2,18 +2,22 @@ package main
 
 import (
 	"context"
-	"encoding/json"
+	"embed"
 	"fmt"
+	"github.com/ArtyomYatsenko/currency/internal/clients/currency"
 	"github.com/ArtyomYatsenko/currency/internal/config"
 	"github.com/ArtyomYatsenko/currency/internal/database"
+	"github.com/ArtyomYatsenko/currency/internal/migrations"
 	"github.com/robfig/cron/v3"
-	"io"
+	"go.uber.org/zap"
 	"log"
-	"net/http"
+	"os"
 	"os/signal"
 	"syscall"
 	"time"
 )
+
+var MigrationsFS embed.FS
 
 func main() {
 
@@ -25,32 +29,70 @@ func main() {
 
 func run() error {
 
-	configApp, err := config.LoadConfig()
+	logger, err := zap.NewProduction() // Создаю логер
+
+	logger.Info("start...")
+	if err != nil {
+		return fmt.Errorf("zap new profaction: %s", err)
+	}
+	defer logger.Sync()
+
+	configPath := os.Getenv("CONFIG_PATH") //Читаю переменные путь к конфигурации из переменной окружения
+
+	if configPath == "" {
+		configPath = "currency/configs" // Указываем путь по умолчанию
+	}
+
+	configApp, err := config.LoadConfig(configPath) // Загружаю конфигурацию
 
 	if err != nil {
 		return fmt.Errorf("config load config: %s", err)
 	}
 
-	db, err := database.NewPostgresDB(configApp.DataBaseConfig)
+	db, err := database.NewPostgresDB(configApp.DataBaseConfig) // Устанавливаю подключение к БД
 
 	if err != nil {
 		return fmt.Errorf("database new postgres db: %s", err)
 	}
 
-	c := cron.New()
-
-	specParam := fmt.Sprintf("%d %d * * *", configApp.TaskStartTime.Minute, configApp.TaskStartTime.Hour)
-
-	fmt.Println(configApp)
-
-	if _, err = c.AddFunc(specParam, dailyTask); err != nil {
-		return fmt.Errorf("cron add func: %s", err)
-
+	migrator, err := migrations.NewMigrator(MigrationsFS, "/app/currency/internal/migrations") // Создаю мигратор
+	if err != nil {
+		return fmt.Errorf("migrations new migrator %s", err)
 	}
 
-	c.Start()
+	err = migrator.ApplyMigrations(db) // Применяю миграции
+	if err != nil {
+		return fmt.Errorf("migrator apply migranions")
+	}
 
-	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	loc, err := time.LoadLocation("Europe/Moscow") // Создаю локацию так, как в контейнере другое время
+
+	if err != nil {
+		return fmt.Errorf("time load location %s", err)
+	}
+
+	client, err := currency.NewHttpClient(configApp.HttpClient.Timeout, logger) // Создаю новый http клиент для подключения
+
+	if err != nil {
+		return fmt.Errorf("currenc new http client %s", err)
+	}
+
+	c := cron.New(cron.WithLocation(loc)) // Создаю крон планировщик
+
+	specParam := fmt.Sprintf("%d %d * * *", configApp.TaskStartTime.Minute, configApp.TaskStartTime.Hour) // Указываю параметры выполнения задачи
+
+	specParam = "*/1 * * * *" // УДАЛИТЬ!!!
+
+	if _, err = c.AddFunc(specParam, func() { // Добавляю задачу в крон
+		dailyTask(client)
+	}); err != nil {
+		return fmt.Errorf("cron add func: %s", err)
+	}
+
+	c.Start() // Запуск крона в отдельной горутине
+
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT) // graceful shutdown
+
 	defer cancel()
 
 	<-ctx.Done()
@@ -58,38 +100,20 @@ func run() error {
 	c.Stop()
 
 	if err = db.Close(); err != nil {
-		log.Printf("database close: %s", err)
+		return fmt.Errorf("database close: %s", err)
 	}
 
 	return nil
 
 }
 
-func dailyTask() {
+func dailyTask(client *currency.Currency) {
+	data, err := client.FetchData()
 
-	log.Println("dailiTask")
-	client := &http.Client{
-		Timeout: 5 * time.Second,
-	}
-
-	resp, err := client.Get("https://latest.currency-api.pages.dev/v1/currencies/rub.json")
 	if err != nil {
-		log.Printf("http client get: %s", err)
+		log.Printf("client fetch data: %s", err)
+		return
 	}
 
-	defer func() {
-		err = resp.Body.Close()
-		if err != nil {
-			log.Printf("http resp body close: %s", err)
-		}
-	}()
-
-	bodyBytes, err := io.ReadAll(resp.Body)
-
-	var data map[string]interface{}
-
-	if err = json.Unmarshal(bodyBytes, &data); err != nil {
-		log.Printf("json unmarshal: %s", err)
-	}
-
+	log.Println(data)
 }

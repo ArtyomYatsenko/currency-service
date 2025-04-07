@@ -1,11 +1,11 @@
 port: "8000"
 task_start_time:
-  hour: 16
-  minute: 06
-Database_config:
-  host: "localhost"
-  port: "5436"
-  user: "postgres"
-  password: "qwerty"
-  dbname: "postgres"
+  hour: 3
+  minute: 39
+database_config:
+  host: "database"
+  port: "5432"
   sslmode: "disable"
+  dir_migrations: ""
+http_client:
+  timeout: 5

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/ArtyomYatsenko/currency/internal/config"
 	"github.com/jmoiron/sqlx"
+	_ "github.com/lib/pq"
 )
 
 func NewPostgresDB(cfg config.DataBaseConfig) (*sqlx.DB, error) {

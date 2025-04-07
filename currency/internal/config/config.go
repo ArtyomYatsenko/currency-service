@@ -7,6 +7,7 @@ import (
 type AppConfig struct {
 	TaskStartTime  TaskStartTime  `mapstructure:"task_start_time"`
 	DataBaseConfig DataBaseConfig `mapstructure:"database_config"`
+	HttpClient     HttpClient     `mapstructure:"http_client"`
 }
 
 type TaskStartTime struct {
@@ -23,12 +24,17 @@ type DataBaseConfig struct {
 	SSLMode  string `mapstructure:"sslmode"`
 }
 
-func LoadConfig() (*AppConfig, error) {
+type HttpClient struct {
+	Timeout int `mapstructure:"timeout"`
+}
+
+func LoadConfig(configPath string) (*AppConfig, error) {
 
 	v := viper.New()
-	v.AddConfigPath("currency/configs")
+	v.AddConfigPath(configPath)
 	v.SetConfigName("config")
 	v.SetConfigType("yaml")
+	v.AutomaticEnv()
 
 	if err := v.ReadInConfig(); err != nil {
 		return nil, err
@@ -40,5 +46,10 @@ func LoadConfig() (*AppConfig, error) {
 		return nil, err
 	}
 
+	a.DataBaseConfig.DBName = v.GetString("DB_NAME")
+	a.DataBaseConfig.User = v.GetString("DB_USER")
+	a.DataBaseConfig.Password = v.GetString("DB_PASSWORD")
+
 	return &a, nil
+
 }
