@@ -7,7 +7,6 @@ import (
 	"github.com/ArtyomYatsenko/currency/internal/clients/currency"
 	"github.com/ArtyomYatsenko/currency/internal/config"
 	"github.com/ArtyomYatsenko/currency/internal/database"
-	"github.com/ArtyomYatsenko/currency/internal/migrations"
 	"github.com/robfig/cron/v3"
 	"go.uber.org/zap"
 	"log"
@@ -54,16 +53,6 @@ func run() error {
 
 	if err != nil {
 		return fmt.Errorf("database new postgres db: %s", err)
-	}
-
-	migrator, err := migrations.NewMigrator(MigrationsFS, "/app/currency/internal/migrations") // Создаю мигратор
-	if err != nil {
-		return fmt.Errorf("migrations new migrator %s", err)
-	}
-
-	err = migrator.ApplyMigrations(db) // Применяю миграции
-	if err != nil {
-		return fmt.Errorf("migrator apply migranions")
 	}
 
 	loc, err := time.LoadLocation("Europe/Moscow") // Создаю локацию так, как в контейнере другое время
