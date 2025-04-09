@@ -7,6 +7,7 @@ import (
 	"github.com/ArtyomYatsenko/currency/internal/config"
 	"github.com/ArtyomYatsenko/currency/internal/database"
 	"github.com/ArtyomYatsenko/currency/internal/migrations"
+	"github.com/ArtyomYatsenko/currency/internal/repository"
 	"github.com/robfig/cron/v3"
 	"go.uber.org/zap"
 	"log"
@@ -27,7 +28,6 @@ func main() {
 func run() error {
 
 	logger, err := zap.NewProduction() // Создаю логер
-
 	logger.Info("start...")
 	if err != nil {
 		return fmt.Errorf("zap new profaction: %s", err)
@@ -51,12 +51,15 @@ func run() error {
 		return fmt.Errorf("database new postgres db: %s", err)
 	}
 
-	migrator, err := migrations.NewMigrator("todo add from config ))))") // Создаю мигратор
+	currencyRepository := repository.NewCurrencyRepository(db) // Абстракция для запросов к БД
+
+	migrator, err := migrations.NewMigrator("currency/internal/migrations/") // Создаю мигратор
 	if err != nil {
 		return fmt.Errorf("migrations new migrator %s", err)
 	}
 
 	err = migrator.ApplyMigrations(db) // Применяю миграции
+
 	if err != nil {
 		return fmt.Errorf("migrator apply migranions")
 	}
@@ -80,7 +83,7 @@ func run() error {
 	specParam = "*/1 * * * *" // УДАЛИТЬ!!!
 
 	if _, err = c.AddFunc(specParam, func() { // Добавляю задачу в крон
-		dailyTask(client)
+		dailyTask(client, currencyRepository, logger)
 	}); err != nil {
 		return fmt.Errorf("cron add func: %s", err)
 	}
@@ -103,13 +106,21 @@ func run() error {
 
 }
 
-func dailyTask(client *currency.Currency) {
+func dailyTask(client *currency.Currency, currencyRepository *repository.CurrencyRepository, logger *zap.Logger) {
+
 	data, err := client.FetchData()
 
 	if err != nil {
-		log.Printf("client fetch data: %s", err)
+		logger.Info("client fetch data", zap.Error(err))
+		return
+	}
+
+	err = currencyRepository.AddCurrency(data)
+	if err != nil {
+		logger.Info("currency repository add currency", zap.Error(err))
 		return
 	}
 
 	log.Println(data)
+
 }
