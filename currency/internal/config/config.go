@@ -1,7 +1,10 @@
 package config
 
 import (
+	"github.com/caarlos0/env/v8"
+	"github.com/joho/godotenv"
 	"github.com/spf13/viper"
+	"time"
 )
 
 type AppConfig struct {
@@ -16,16 +19,16 @@ type TaskStartTime struct {
 }
 
 type DataBaseConfig struct {
-	Host     string `mapstructure:"host"`
-	Port     string `mapstructure:"port"`
-	DBName   string `mapstructure:"dbname"`
-	Password string `mapstructure:"password"`
-	User     string `mapstructure:"user"`
-	SSLMode  string `mapstructure:"sslmode"`
+	Host     string `env:"DB_HOST"`
+	Port     string `env:"DB_PORT"`
+	DBName   string `env:"DB_NAME"`
+	Password string `env:"DB_PASSWORD"`
+	User     string `env:"DB_USER"`
+	SSLMode  string `env:"DB_SSLMODE"`
 }
 
 type HttpClient struct {
-	Timeout int `mapstructure:"timeout"`
+	Timeout time.Duration `mapstructure:"timeout"`
 }
 
 func LoadConfig(configPath string) (*AppConfig, error) {
@@ -42,13 +45,17 @@ func LoadConfig(configPath string) (*AppConfig, error) {
 
 	var a AppConfig
 
-	if err := v.Unmarshal(&a); err != nil {
+	if err := v.Unmarshal(&a); err != nil { // Читаем данные из файла конфигурации .yaml
 		return nil, err
 	}
 
-	a.DataBaseConfig.DBName = v.GetString("DB_NAME")
-	a.DataBaseConfig.User = v.GetString("DB_USER")
-	a.DataBaseConfig.Password = v.GetString("DB_PASSWORD")
+	if err := godotenv.Load(); err != nil {
+		return nil, err
+	}
+
+	if err := env.Parse(&a.DataBaseConfig); err != nil {
+		return nil, err
+	}
 
 	return &a, nil
 

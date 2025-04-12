@@ -2,6 +2,7 @@ package currency
 
 import (
 	"encoding/json"
+	"github.com/ArtyomYatsenko/currency/internal/config"
 	"go.uber.org/zap"
 	"io"
 	"log"
@@ -18,13 +19,13 @@ type Currency struct {
 	logger     *zap.Logger
 }
 
-func NewHttpClient(timeout int, logger *zap.Logger) (*Currency, error) {
+func NewHttpClient(configHttp config.HttpClient, logger *zap.Logger) (*Currency, error) {
 	parseURL, err := url.Parse(currencyUrl)
 	if err != nil {
 		return nil, err
 	}
 	client := &http.Client{
-		Timeout: time.Duration(timeout) * time.Second,
+		Timeout: configHttp.Timeout * time.Second,
 	}
 	return &Currency{
 		baseURL:    parseURL,
