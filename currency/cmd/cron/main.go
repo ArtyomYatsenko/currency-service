@@ -51,7 +51,7 @@ func run() error {
 
 	currencyRepository := repository.NewCurrencyRepository(db) // Абстракция для запросов к БД
 
-	migrator, err := migrations.NewMigrator("currency/internal/migrations/") // Создаю мигратор
+	migrator, err := migrations.NewMigrator(configApp.DataBaseConfig.DirMigrations, logger) // Создаю мигратор
 	if err != nil {
 		return fmt.Errorf("migrations new migrator %s", err)
 	}
@@ -113,7 +113,7 @@ func dailyTask(client *currency.Currency, currencyRepository *repository.Currenc
 		return
 	}
 
-	err = currencyRepository.AddCurrency(data)
+	err = currencyRepository.AddCurrencies(data)
 	if err != nil {
 		logger.Info("currency repository add currency", zap.Error(err))
 		return

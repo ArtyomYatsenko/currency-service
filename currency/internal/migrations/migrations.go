@@ -6,14 +6,16 @@ import (
 	"github.com/golang-migrate/migrate/v4/database/postgres"
 	"github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/jmoiron/sqlx"
+	"go.uber.org/zap"
 	"path/filepath"
 )
 
 type Migrator struct {
 	migrationsPath string
+	logger         *zap.Logger
 }
 
-func NewMigrator(migrationsPath string) (*Migrator, error) {
+func NewMigrator(migrationsPath string, logger *zap.Logger) (*Migrator, error) {
 	absPath, err := filepath.Abs(migrationsPath)
 	if err != nil {
 		return nil, err
@@ -21,6 +23,7 @@ func NewMigrator(migrationsPath string) (*Migrator, error) {
 
 	return &Migrator{
 		migrationsPath: absPath,
+		logger:         logger,
 	}, nil
 }
 
@@ -42,10 +45,6 @@ func (m *Migrator) ApplyMigrations(db *sqlx.DB) error {
 	if err != nil {
 		return err
 	}
-
-	//defer func() {  // Закомментил, не знаю как правильно его закрыть и нужно ли, так как если закрываю здесь, то закрывается подключение к БД
-	//	migrator.Close()
-	//}()
 
 	if err = migrator.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		return err

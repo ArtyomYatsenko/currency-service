@@ -12,9 +12,10 @@ type Server struct {
 	logger     *zap.Logger
 }
 
-func (s *Server) Start(config config.Server) error {
+func (s *Server) Start(config config.Server, handler http.Handler) error {
 	s.httpServer = &http.Server{
 		Addr:         config.Address + ":" + config.Port,
+		Handler:      handler,
 		WriteTimeout: config.WriteTimeout,
 		ReadTimeout:  config.ReadTimeout,
 	}

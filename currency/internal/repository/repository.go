@@ -16,7 +16,7 @@ func NewCurrencyRepository(db *sqlx.DB) *CurrencyRepository {
 	}
 }
 
-func (c *CurrencyRepository) AddCurrency(date map[string]interface{}) error {
+func (c *CurrencyRepository) AddCurrencies(date map[string]interface{}) error {
 
 	dateNow, ok := date["date"].(string)
 	if !ok {
@@ -37,10 +37,7 @@ func (c *CurrencyRepository) AddCurrency(date map[string]interface{}) error {
 
 	for currency, value := range currencies {
 
-		args = append(args, currency)
-		args = append(args, "rub")
-		args = append(args, value)
-		args = append(args, dateNow)
+		args = append(args, currency, "rub", value, dateNow)
 
 		placeholders = append(placeholders, fmt.Sprintf("($%d, $%d, $%d, $%d)", i, i+1, i+2, i+3))
 		i += 4

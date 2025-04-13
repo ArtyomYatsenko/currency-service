@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"github.com/ArtyomYatsenko/gateway/internal/config"
+	"github.com/ArtyomYatsenko/gateway/internal/handler"
 	"github.com/ArtyomYatsenko/gateway/internal/server"
 	"go.uber.org/zap"
 	"log"
@@ -38,8 +39,8 @@ func run() error {
 	logger.Info("config", zap.Any("", configApp.Server))
 
 	srv := &server.Server{}
-
-	if err = srv.Start(configApp.Server); err != nil {
+	handlers := &handler.Handler{}
+	if err = srv.Start(configApp.Server, handlers.InitRoutes()); err != nil {
 		return err
 	}
 

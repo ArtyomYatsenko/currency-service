@@ -4,7 +4,7 @@ WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN go build -o cron ./currency/cmd/cron/main.go
-CMD ["./cron --config=./currency/configs"]
+RUN go build -o cronApp ./currency/cmd/cron/main.go
+CMD ["./cronApp --config=./currency/configs"]
 
 

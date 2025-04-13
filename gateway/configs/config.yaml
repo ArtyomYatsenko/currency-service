@@ -1,5 +1,5 @@
 server:
-  port : "8080"
-  address: "localhost"
+  port : "8082"
+  address: "0.0.0.0"
   write_timeout: 5s
   read_timeout: 5s
