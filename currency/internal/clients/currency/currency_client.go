@@ -3,6 +3,7 @@ package currency
 import (
 	"encoding/json"
 	"github.com/ArtyomYatsenko/currency/internal/config"
+	"github.com/ArtyomYatsenko/currency/internal/dto"
 	"go.uber.org/zap"
 	"io"
 	"log"
@@ -34,7 +35,9 @@ func NewHttpClient(configHttp config.HttpClient, logger *zap.Logger) (*Currency,
 	}, nil
 }
 
-func (c *Currency) FetchData() (map[string]interface{}, error) {
+func (c *Currency) FetchData() (dto.Currency, error) {
+
+	data := dto.Currency{}
 
 	urlStr := c.baseURL.String()
 
@@ -43,27 +46,24 @@ func (c *Currency) FetchData() (map[string]interface{}, error) {
 	resp, err := c.httpClient.Get(urlStr)
 
 	if err != nil {
-		return nil, err
+		return data, err
 	}
 
 	defer func() {
 		if errClose := resp.Body.Close(); errClose != nil {
 			c.logger.Error("resp body close", zap.Error(errClose))
 		}
-
 	}()
 
 	bodyBytes, err := io.ReadAll(resp.Body)
 
 	if err != nil {
-		return nil, err
+		return data, err
 	}
-
-	var data map[string]interface{}
 
 	if err = json.Unmarshal(bodyBytes, &data); err != nil {
 		log.Printf("json unmarshal: %s", err)
-		return nil, err
+		return data, err
 	}
 
 	return data, nil

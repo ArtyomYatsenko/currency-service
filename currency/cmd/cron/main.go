@@ -49,6 +49,9 @@ func run() error {
 		return fmt.Errorf("database new postgres db: %s", err)
 	}
 
+	//repos := repository.NewRepository(db)
+	//services := service.NewService(repos)
+
 	currencyRepository := repository.NewCurrencyRepository(db) // Абстракция для запросов к БД
 
 	migrator, err := migrations.NewMigrator(configApp.DataBaseConfig.DirMigrations, logger) // Создаю мигратор

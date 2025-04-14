@@ -2,9 +2,12 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"github.com/ArtyomYatsenko/gateway/internal/config"
 	"github.com/ArtyomYatsenko/gateway/internal/handler"
+	"github.com/ArtyomYatsenko/gateway/internal/repository"
 	"github.com/ArtyomYatsenko/gateway/internal/server"
+	"github.com/ArtyomYatsenko/gateway/internal/service"
 	"go.uber.org/zap"
 	"log"
 )
@@ -38,8 +41,20 @@ func run() error {
 
 	logger.Info("config", zap.Any("", configApp.Server))
 
-	srv := &server.Server{}
-	handlers := &handler.Handler{}
+	logger.Info("conf rds", zap.Any("", configApp.DataBaseConfig))
+
+	rdb := repository.NewRedisRepository(configApp.DataBaseConfig)
+	fmt.Println(rdb)
+
+	// Соблюдаю чистую архитектуру и реализую три слоя, handlers - транспортный
+	// services - бизнес логика
+	// repository - база данных
+	base := repository.NewMyBase()
+	repos := repository.NewRepository(base)
+	services := service.NewService(repos)
+	handlers := handler.NewHandler(services)
+
+	srv := new(server.Server)
 	if err = srv.Start(configApp.Server, handlers.InitRoutes()); err != nil {
 		return err
 	}
