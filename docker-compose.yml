@@ -1,27 +1,34 @@
 services:
+
   currency:
-    build: ./
-    command: ./cron
+    build:
+      context: .
+      dockerfile: currency/Dockerfile
+    command: ./cronApp --config=./currency/configs
     ports:
-      - 8080:8080
+      - 8081:8081
     depends_on:
-      database:
+      postgresql:
         condition: service_healthy
     environment:
-      DB_NAME: ${DB_NAME}
-      DB_USER: ${DB_USER}
-      DB_PASSWORD: ${DB_PASSWORD}
-      CONFIG_PATH: ${CONFIG_PATH}
+      DB_NAME: ${CURRENCY_DB_NAME}
+      DB_USER: ${CURRENCY_DB_USER}
+      DB_PASSWORD: ${CURRENCY_DB_PASSWORD}
+      DB_HOST: ${CURRENCY_DB_HOST}
+      DB_PORT: ${CURRENCY_DB_PORT}
+      DB_SSLMODE: ${CURRENCY_DB_SSLMODE}
+      DB_DIR_MIGRATIONS: ${CURRENCY_DB_DIR_MIGRATIONS}
 
-  database:
+
+  postgresql:
     restart: always
     image: postgres:latest
     volumes:
       - pgdata:/var/lib/postgresql/data
     environment:
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_PASSWORD: ${CURRENCY_DB_PASSWORD}
+      POSTGRES_USER: ${CURRENCY_DB_USER}
+      POSTGRES_DB: ${CURRENCY_DB_NAME}
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}" ]
       interval: 6s
@@ -29,5 +36,47 @@ services:
       retries: 10
     ports:
       - 5432:5432
+    command: postgres -c listen_addresses='*'
+
+  auth-generator:
+    image: andrianovartemii/gm-test-task-auth-generator:latest
+    ports:
+      - 8080:8080
+    environment:
+      AUTH_TOKEN_LIFETIME: 2
+
+  gateway:
+    build:
+      context: .
+      dockerfile: gateway/Dockerfile
+    command: ./gatewayApp --config=./gateway/configs
+    environment:
+      DB_HOST: ${GATEWAY_DB_HOST}
+      DB_PORT: ${GATEWAY_DB_PORT}
+      DB_PASSWORD: ${GATEWAY_DB_PASSWORD}
+      DB_NUMBER: ${GATEWAY_DB_NUMBER}
+    ports:
+      - 8082:8082
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  redis:
+    image: redis:7
+    container_name: redis
+    healthcheck:
+      test: [ "CMD", "redis-cli", "-a", "${GATEWAY_DB_PASSWORD}", "ping" ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    ports:
+      - 6379:6379
+    volumes:
+      - redis_data:/data
+    environment:
+      REDIS_PASSWORD: ${GATEWAY_DB_PASSWORD}
+    command: [ "redis-server", "--save", "60", "1", "--loglevel", "warning" ]
+
 volumes:
   pgdata:
+  redis_data:

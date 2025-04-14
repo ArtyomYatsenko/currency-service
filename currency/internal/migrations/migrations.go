@@ -1,49 +1,50 @@
 package migrations
 
 import (
-	"embed"
 	"errors"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
-	"github.com/golang-migrate/migrate/v4/source"
-	"github.com/golang-migrate/migrate/v4/source/iofs"
+	"github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/jmoiron/sqlx"
+	"go.uber.org/zap"
+	"path/filepath"
 )
 
-//go:embed *.sql
-var MigrationsFS embed.FS
-
 type Migrator struct {
-	srcDriver source.Driver
+	migrationsPath string
+	logger         *zap.Logger
 }
 
-func NewMigrator(dirName string) (*Migrator, error) {
-	d, err := iofs.New(MigrationsFS, ".")
+func NewMigrator(migrationsPath string, logger *zap.Logger) (*Migrator, error) {
+	absPath, err := filepath.Abs(migrationsPath)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Migrator{
-		srcDriver: d,
+		migrationsPath: absPath,
+		logger:         logger,
 	}, nil
 }
 
 func (m *Migrator) ApplyMigrations(db *sqlx.DB) error {
 	sqlDB := db.DB // Так как использую *sqlx.DB получаю *sql.DB
 
+	// Создаём драйвер для файловой системы
+	fileSource, err := (&file.File{}).Open(m.migrationsPath)
+	if err != nil {
+		return err
+	}
+
 	driver, err := postgres.WithInstance(sqlDB, &postgres.Config{})
 	if err != nil {
 		return err
 	}
 
-	migrator, err := migrate.NewWithInstance("migration_embeded_sql_files", m.srcDriver, "psql_db", driver)
+	migrator, err := migrate.NewWithInstance("migration_embeded_sql_files", fileSource, "psql_db", driver)
 	if err != nil {
 		return err
 	}
-
-	defer func() {
-		migrator.Close()
-	}()
 
 	if err = migrator.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		return err

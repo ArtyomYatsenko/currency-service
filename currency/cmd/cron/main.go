@@ -2,15 +2,16 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"github.com/ArtyomYatsenko/currency/internal/clients/currency"
 	"github.com/ArtyomYatsenko/currency/internal/config"
 	"github.com/ArtyomYatsenko/currency/internal/database"
 	"github.com/ArtyomYatsenko/currency/internal/migrations"
+	"github.com/ArtyomYatsenko/currency/internal/repository"
 	"github.com/robfig/cron/v3"
 	"go.uber.org/zap"
 	"log"
-	"os"
 	"os/signal"
 	"syscall"
 	"time"
@@ -27,20 +28,17 @@ func main() {
 func run() error {
 
 	logger, err := zap.NewProduction() // Создаю логер
-
-	logger.Info("start...")
 	if err != nil {
 		return fmt.Errorf("zap new profaction: %s", err)
 	}
 	defer logger.Sync()
 
-	configPath := os.Getenv("CONFIG_PATH") //Читаю переменные путь к конфигурации из переменной окружения
+	logger.Info("start...")
 
-	if configPath == "" {
-		configPath = "currency/configs" // Указываем путь по умолчанию
-	}
+	configPath := flag.String("config", "./currency/configs", "path to the config file") // Получаю путь к конфигурации через параметры запуска
+	flag.Parse()
 
-	configApp, err := config.LoadConfig(configPath) // Загружаю конфигурацию
+	configApp, err := config.LoadConfig(*configPath) // Загружаю конфигурацию
 
 	if err != nil {
 		return fmt.Errorf("config load config: %s", err)
@@ -51,12 +49,18 @@ func run() error {
 		return fmt.Errorf("database new postgres db: %s", err)
 	}
 
-	migrator, err := migrations.NewMigrator("todo add from config ))))") // Создаю мигратор
+	//repos := repository.NewRepository(db)
+	//services := service.NewService(repos)
+
+	currencyRepository := repository.NewCurrencyRepository(db) // Абстракция для запросов к БД
+
+	migrator, err := migrations.NewMigrator(configApp.DataBaseConfig.DirMigrations, logger) // Создаю мигратор
 	if err != nil {
 		return fmt.Errorf("migrations new migrator %s", err)
 	}
 
 	err = migrator.ApplyMigrations(db) // Применяю миграции
+
 	if err != nil {
 		return fmt.Errorf("migrator apply migranions")
 	}
@@ -67,7 +71,7 @@ func run() error {
 		return fmt.Errorf("time load location %s", err)
 	}
 
-	client, err := currency.NewHttpClient(configApp.HttpClient.Timeout, logger) // Создаю новый http клиент для подключения
+	client, err := currency.NewHttpClient(configApp.HttpClient, logger) // Создаю новый http клиент для подключения
 
 	if err != nil {
 		return fmt.Errorf("currenc new http client %s", err)
@@ -80,7 +84,7 @@ func run() error {
 	specParam = "*/1 * * * *" // УДАЛИТЬ!!!
 
 	if _, err = c.AddFunc(specParam, func() { // Добавляю задачу в крон
-		dailyTask(client)
+		dailyTask(client, currencyRepository, logger)
 	}); err != nil {
 		return fmt.Errorf("cron add func: %s", err)
 	}
@@ -103,13 +107,21 @@ func run() error {
 
 }
 
-func dailyTask(client *currency.Currency) {
+func dailyTask(client *currency.Currency, currencyRepository *repository.CurrencyRepository, logger *zap.Logger) {
+
 	data, err := client.FetchData()
 
 	if err != nil {
-		log.Printf("client fetch data: %s", err)
+		logger.Info("client fetch data", zap.Error(err))
+		return
+	}
+
+	err = currencyRepository.AddCurrencies(data)
+	if err != nil {
+		logger.Info("currency repository add currency", zap.Error(err))
 		return
 	}
 
 	log.Println(data)
+
 }
